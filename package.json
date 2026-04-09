@@ -6,6 +6,12 @@
   "bin": {
     "orcastrator": "./dist/index.js"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/config/builder.d.ts",
+      "default": "./dist/config/builder.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
