@@ -12,6 +12,8 @@ import { AgentLifecycleManager } from "../agents/lifecycle.js";
 import { getOrcastratorDir } from "../config/loader.js";
 import { appendSessionLog } from "../state/log.js";
 import { randomUUID } from "node:crypto";
+import { buildGuardrails, type GuardrailConfig } from "../guardrails/index.js";
+import type { GuardrailsOverride } from "../client/copilot.js";
 
 export interface CoordinatorResult {
   strategy: "single" | "multi" | "fallback";
@@ -24,11 +26,18 @@ export class Coordinator {
   private config: OrcastratorConfig;
   private lifecycle: AgentLifecycleManager;
   private orcastratorDir: string;
+  private guardrailsOverride: GuardrailsOverride | undefined;
 
   constructor(config: OrcastratorConfig, cwd?: string) {
     this.config = config;
     this.lifecycle = new AgentLifecycleManager();
     this.orcastratorDir = getOrcastratorDir(cwd);
+
+    // Build guardrails if configured
+    const guardrailConfig = config.guardrails as GuardrailConfig | undefined;
+    this.guardrailsOverride = guardrailConfig
+      ? buildGuardrails(guardrailConfig)
+      : undefined;
   }
 
   async handleTask(
@@ -76,6 +85,7 @@ export class Coordinator {
       task: task.text,
       lifecycle: this.lifecycle,
       workingDirectory: options?.workingDirectory,
+      guardrailsOverride: this.guardrailsOverride,
     });
 
     const duration = Date.now() - start;

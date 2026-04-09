@@ -1,8 +1,14 @@
 // Copilot SDK client wrapper
 
 import { CopilotClient, approveAll } from "@github/copilot-sdk";
-import type { CopilotSession } from "@github/copilot-sdk";
+import type { CopilotSession, PermissionHandler } from "@github/copilot-sdk";
 import type { SessionConfig } from "../core/types.js";
+import type { SessionHooks } from "../guardrails/hooks.js";
+
+export interface GuardrailsOverride {
+  permissionHandler: PermissionHandler;
+  hooks: SessionHooks;
+}
 
 let _client: CopilotClient | null = null;
 
@@ -32,6 +38,7 @@ export async function getClient(): Promise<CopilotClient> {
 
 export async function createSession(
   config: SessionConfig,
+  guardrails?: GuardrailsOverride,
 ): Promise<CopilotSession> {
   const client = await getClient();
 
@@ -39,7 +46,8 @@ export async function createSession(
     model: config.model,
     systemMessage: { mode: "replace", content: config.systemMessage },
     streaming: true,
-    onPermissionRequest: approveAll,
+    onPermissionRequest: guardrails?.permissionHandler ?? approveAll,
+    ...(guardrails?.hooks ? { hooks: guardrails.hooks } : {}),
     ...(config.workingDirectory
       ? { workingDirectory: config.workingDirectory }
       : {}),

@@ -7,6 +7,9 @@ import type {
   RoutingConfigSchema,
   OrcastratorConfigSchema,
 } from "../config/builder.js";
+import type { GuardrailConfig } from "../guardrails/index.js";
+
+export type { GuardrailConfig } from "../guardrails/index.js";
 
 // ---------------------------------------------------------------------------
 // Config types (inferred from zod schemas)

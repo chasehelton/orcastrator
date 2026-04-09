@@ -1,6 +1,10 @@
 // Config builder API — source of truth for Orcastrator configuration
 
 import { z } from "zod";
+import {
+  GuardrailInputSchema,
+  normalizeGuardrails,
+} from "../guardrails/index.js";
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -37,6 +41,7 @@ export const OrcastratorConfigSchema = z.object({
   agents: z.array(AgentConfigSchema).min(1),
   routing: RoutingConfigSchema,
   skills: z.array(z.string()).default([]),
+  guardrails: GuardrailInputSchema.optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -78,5 +83,8 @@ export function defineOrcastrator(config: OrcastratorInput) {
     }
   }
 
-  return parsed;
+  // Normalize guardrails (true → defaults, object → merged with defaults)
+  const guardrails = normalizeGuardrails(parsed.guardrails);
+
+  return { ...parsed, guardrails };
 }

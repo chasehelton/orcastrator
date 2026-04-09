@@ -5,12 +5,14 @@ import type {
   AgentConfig,
   AgentHandle,
   AgentStatus,
+  GuardrailConfig,
   OrcastratorConfig,
   SpawnResult,
 } from "../core/types.js";
 import { compileCharter } from "./charter-compiler.js";
 import { resolveModel } from "./model-selector.js";
 import * as copilot from "../client/copilot.js";
+import type { GuardrailsOverride } from "../client/copilot.js";
 
 interface ManagedAgent {
   handle: AgentHandle;
@@ -27,6 +29,7 @@ export class AgentLifecycleManager {
     orcastratorDir: string,
     taskContext?: string,
     workingDirectory?: string,
+    guardrailsOverride?: GuardrailsOverride,
   ): Promise<SpawnResult> {
     const name = agentConfig.name;
 
@@ -57,7 +60,7 @@ export class AgentLifecycleManager {
         systemMessage,
         agentName: name,
         workingDirectory,
-      });
+      }, guardrailsOverride);
 
       handle.sessionId = session.sessionId;
       handle.status = "active";
