@@ -68,3 +68,30 @@ export function getDefaultBranch(repoPath: string): string {
     return "main";
   }
 }
+
+/**
+ * Remove the worktree checkout directory without deleting the branch.
+ * Use this after creating a PR so the branch stays alive for review.
+ */
+export function pruneWorktree(repoPath: string, worktreePath: string): void {
+  try {
+    execSync(`git -C "${repoPath}" worktree remove "${worktreePath}" --force`, {
+      stdio: "pipe",
+    });
+  } catch {
+    // Worktree may already be removed
+  }
+}
+
+/**
+ * Turn arbitrary task text into a branch-safe slug, e.g.
+ * "Fix the login bug" → "fix-the-login-bug"
+ */
+export function taskSlug(text: string, maxLength = 40): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/, "")
+    .slice(0, maxLength)
+    .replace(/-+$/, "");
+}

@@ -43,6 +43,7 @@ program
   .argument("<number>", "Issue number", parseInt)
   .option("-r, --repo <owner/repo>", "Repository (defaults to current git remote)")
   .option("-a, --agent <name>", "Force routing to a specific agent")
+  .option("--pr", "Create a PR when done")
   .action(issueCommand);
 
 program
