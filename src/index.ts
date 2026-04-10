@@ -6,6 +6,7 @@ import { Command } from "commander";
 import { initCommand } from "./cli/init.js";
 import { buildCommand } from "./cli/build.js";
 import { runCommand } from "./cli/run.js";
+import { chatCommand } from "./cli/chat.js";
 import { issueCommand } from "./cli/issue.js";
 import { statusCommand } from "./cli/status.js";
 import { agentsCommand } from "./cli/agents.js";
@@ -36,6 +37,12 @@ program
   .option("--pr", "Create a PR when done")
   .option("--dry-run", "Show routing without executing")
   .action(runCommand);
+
+program
+  .command("chat")
+  .description("Start an interactive multi-turn chat session")
+  .option("-a, --agent <name>", "Lock to a specific agent (bypass routing)")
+  .action(chatCommand);
 
 program
   .command("issue")
