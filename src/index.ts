@@ -3,6 +3,7 @@
 // Orcastrator CLI — lightweight multi-agent coding runtime
 
 import { Command } from "commander";
+import { createRequire } from "module";
 import { initCommand } from "./cli/init.js";
 import { buildCommand } from "./cli/build.js";
 import { runCommand } from "./cli/run.js";
@@ -11,12 +12,15 @@ import { issueCommand } from "./cli/issue.js";
 import { statusCommand } from "./cli/status.js";
 import { agentsCommand } from "./cli/agents.js";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
+
 const program = new Command();
 
 program
   .name("orcastrator")
   .description("Lightweight multi-agent coding runtime built on GitHub Copilot SDK")
-  .version("0.1.0");
+  .version(version);
 
 program
   .command("init")
