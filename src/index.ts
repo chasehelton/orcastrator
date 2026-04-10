@@ -20,6 +20,7 @@ program
 program
   .command("init")
   .description("Scaffold a new orcastrator config and .orcastrator/ directory")
+  .option("--default", "Use default agent configuration instead of Copilot-powered generation")
   .action(initCommand);
 
 program

@@ -8,6 +8,7 @@ import type { OrcastratorConfig } from "../core/types.js";
 
 const CONFIG_FILENAMES = [
   "orcastrator.config.ts",
+  "orcastrator.config.mts",
   "orcastrator.config.js",
   "orcastrator.config.mjs",
 ];

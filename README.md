@@ -7,8 +7,11 @@ Inspired by [bradygaster/squad](https://github.com/bradygaster/squad), stripped 
 ## Quick Start
 
 ```bash
-# Initialize in your project
+# Initialize in your project (analyzes repo via Copilot to generate tailored agents)
 npx orcastrator init
+
+# Or use the default template without Copilot
+npx orcastrator init --default
 
 # Customize your agents
 vim orcastrator.config.ts
@@ -25,7 +28,7 @@ npx orcastrator issue 42
 
 ## How It Works
 
-1. **Define agents** in `orcastrator.config.ts` — each with a role, expertise, model, and instructions
+1. **Define agents** — `orcastrator init` scans your repo and uses Copilot to generate a tailored agent team in `orcastrator.config.ts`
 2. **Build charters** — config generates markdown files in `.orcastrator/` that become system prompts
 3. **Route tasks** — pattern matching routes your task to the right agent(s)
 4. **Fan out** — multi-agent tasks run in parallel via `Promise.allSettled`
@@ -35,7 +38,8 @@ npx orcastrator issue 42
 
 | Command | Description |
 |---------|-------------|
-| `orcastrator init` | Scaffold config + `.orcastrator/` directory |
+| `orcastrator init` | Scaffold config with Copilot-powered agent generation |
+| `orcastrator init --default` | Scaffold config with default agent template |
 | `orcastrator build` | Generate markdown from config |
 | `orcastrator run "<task>"` | Execute an ad-hoc task |
 | `orcastrator issue <number>` | Work on a GitHub issue |
