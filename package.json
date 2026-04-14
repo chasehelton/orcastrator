@@ -1,6 +1,6 @@
 {
   "name": "@chasehelton/orcastrator",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Lightweight CLI-first multi-agent coding runtime built on GitHub Copilot SDK",
   "type": "module",
   "bin": {
