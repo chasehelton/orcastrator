@@ -35,6 +35,20 @@ export const RoutingConfigSchema = z.object({
   defaultAgent: z.string(),
 });
 
+export const LinearConfigSchema = z.object({
+  /**
+   * Linear personal API key. Defaults to the LINEAR_API_KEY environment
+   * variable — prefer the env var so secrets stay out of committed configs.
+   */
+  apiKey: z.string().optional(),
+  /**
+   * Default team key (e.g. "ENG") used when listing issues without an
+   * explicit identifier. Optional — the SDK can still fetch issues by
+   * full identifier (e.g. "ENG-123") without this set.
+   */
+  defaultTeam: z.string().optional(),
+});
+
 export const OrcastratorConfigSchema = z.object({
   name: z.string().default("orcastrator"),
   defaultModel: z.string().default("claude-sonnet-4.6"),
@@ -42,6 +56,7 @@ export const OrcastratorConfigSchema = z.object({
   routing: RoutingConfigSchema,
   skills: z.array(z.string()).default([]),
   guardrails: GuardrailInputSchema.optional(),
+  linear: LinearConfigSchema.optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -51,6 +66,7 @@ export const OrcastratorConfigSchema = z.object({
 export type AgentInput = z.input<typeof AgentConfigSchema>;
 export type RoutingRuleInput = z.input<typeof RoutingRuleSchema>;
 export type RoutingInput = z.input<typeof RoutingConfigSchema>;
+export type LinearInput = z.input<typeof LinearConfigSchema>;
 export type OrcastratorInput = z.input<typeof OrcastratorConfigSchema>;
 
 export function defineAgent(config: AgentInput) {

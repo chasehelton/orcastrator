@@ -43,7 +43,7 @@ export default defineOrcastrator({
       { pattern: /cli|command|ux|spinner|output|chalk|prompt|init|status/, agents: ["cli-dev"], description: "CLI commands, user-facing output, and interactive prompts" },
       { pattern: /config|schema|charter|skill|template|scan|generate config|orcastrator\.config/, agents: ["config-architect"], description: "Config DSL, agent charter generation, repo scanning, and skill registry" },
       { pattern: /guardrail|permission|hook|policy|safety|restrict|allow|deny/, agents: ["guardrails-dev"], description: "Permission models, lifecycle hooks, and safety enforcement" },
-      { pattern: /git|worktree|branch|pr|pull request|issue|github/, agents: ["git-github-dev"], description: "Git worktree management and GitHub API integrations" },
+      { pattern: /git|worktree|branch|pr|pull request|issue|github|linear|ENG-\d+/, agents: ["git-github-dev"], description: "Git worktree management, GitHub API integrations, and Linear issue workflows" },
       { pattern: /coordinator|router|fan.out|lifecycle|state|history|decision|model.selector|agent runtime/, agents: ["core-dev"], description: "Core runtime: coordination, routing, fan-out, and state management" },
       { pattern: /refactor|redesign|architect|overhaul|restructure|rethink/, agents: ["core-dev", "config-architect", "guardrails-dev"], description: "Complex cross-cutting changes requiring multi-agent collaboration" },
     ],

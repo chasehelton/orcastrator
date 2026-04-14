@@ -9,6 +9,7 @@ import { buildCommand } from "./cli/build.js";
 import { runCommand } from "./cli/run.js";
 import { chatCommand } from "./cli/chat.js";
 import { issueCommand } from "./cli/issue.js";
+import { issueListCommand } from "./cli/list.js";
 import { statusCommand } from "./cli/status.js";
 import { agentsCommand } from "./cli/agents.js";
 
@@ -50,12 +51,22 @@ program
 
 program
   .command("issue")
-  .description("Work on a GitHub issue")
-  .argument("<number>", "Issue number", parseInt)
-  .option("-r, --repo <owner/repo>", "Repository (defaults to current git remote)")
+  .description("Work on a GitHub or Linear issue")
+  .argument("<ref>", "GitHub issue number (e.g. 42) or Linear identifier (e.g. ENG-123)")
+  .option("-r, --repo <owner/repo>", "GitHub repository (defaults to current git remote)")
   .option("-a, --agent <name>", "Force routing to a specific agent")
+  .option("-p, --provider <github|linear>", "Issue provider (auto-detected from ref format by default)")
   .option("--pr", "Create a PR when done")
   .action(issueCommand);
+
+program
+  .command("list")
+  .description("List open issues from Linear or GitHub")
+  .option("-p, --provider <github|linear>", "Issue provider (auto-detected from config by default)")
+  .option("-t, --team <key>", "Linear team key to filter by (e.g. ENG)")
+  .option("--mine", "Only show issues assigned to you")
+  .option("-r, --repo <owner/repo>", "GitHub repository (for GitHub issues)")
+  .action(issueListCommand);
 
 program
   .command("status")

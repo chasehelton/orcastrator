@@ -40,12 +40,16 @@ export interface AgentHandle {
 }
 
 export interface TaskContext {
-  source: "cli" | "issue";
+  source: "cli" | "issue" | "linear";
   text: string;
+  /** GitHub issue number */
   issueNumber?: number;
+  /** URL to the issue (GitHub or Linear) */
   issueUrl?: string;
   labels?: string[];
   repo?: string;
+  /** Linear issue identifier, e.g. "ENG-123" */
+  linearId?: string;
 }
 
 export interface RoutingMatch {

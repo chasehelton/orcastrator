@@ -24,6 +24,12 @@ npx orcastrator run "build the login page"
 
 # Work on a GitHub issue
 npx orcastrator issue 42
+
+# Work on a Linear issue (auto-detected from identifier format)
+npx orcastrator issue ENG-123
+
+# List open issues (auto-detects provider from config)
+npx orcastrator list
 ```
 
 ## How It Works
@@ -42,9 +48,15 @@ npx orcastrator issue 42
 | `orcastrator init --default` | Scaffold config with default agent template |
 | `orcastrator build` | Generate markdown from config |
 | `orcastrator run "<task>"` | Execute an ad-hoc task |
-| `orcastrator issue <number>` | Work on a GitHub issue |
+| `orcastrator issue <number>` | Work on a GitHub issue (e.g. `42`) |
+| `orcastrator issue <identifier>` | Work on a Linear issue (e.g. `ENG-123`) |
+| `orcastrator list` | List open issues (Linear or GitHub) |
+| `orcastrator list --provider linear --team ENG` | List open Linear issues for a team |
+| `orcastrator list --mine` | List issues assigned to you |
 | `orcastrator status` | Show agents, routing, and recent sessions |
 | `orcastrator agents list` | List configured agents |
+
+The issue provider is **auto-detected**: identifiers like `ENG-123` route to Linear; plain numbers like `42` route to GitHub. Use `--provider` to override.
 
 ## Config
 
@@ -78,8 +90,25 @@ export default defineOrcastrator({
     ],
     defaultAgent: "builder",
   }),
+
+  // Optional: configure Linear integration
+  linear: {
+    // Defaults to LINEAR_API_KEY env var — prefer the env var to avoid committing secrets
+    // apiKey: "lin_api_...",
+    defaultTeam: "ENG",  // Used by `orcastrator list` when no --team flag is given
+  },
 });
 ```
+
+### Linear setup
+
+1. Generate a personal API key at [linear.app/settings/account/security](https://linear.app/settings/account/security)
+2. Set it as an environment variable: `export LINEAR_API_KEY=lin_api_...`
+3. Optionally add `linear: { defaultTeam: "ENG" }` to your config for `orcastrator list` filtering
+
+When working on a Linear issue, orcastrator will automatically:
+- Mark the issue **In Progress** when work starts
+- Post a PR comment and mark the issue **In Review** when a PR is created (`--pr` flag)
 
 ## Architecture
 
@@ -108,8 +137,9 @@ User (CLI)
 ## Requirements
 
 - Node.js ≥ 22.0.0
-- `gh` CLI (for issue/PR commands)
+- `gh` CLI (for GitHub issue/PR commands)
 - GitHub Copilot access (authenticated via `gh auth login`)
+- `LINEAR_API_KEY` env var (for Linear issue workflows)
 
 ## License
 
