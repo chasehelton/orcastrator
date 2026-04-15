@@ -8,6 +8,7 @@
 import type { OrcastratorConfig, AgentConfig } from "./types.js";
 import { AgentLifecycleManager } from "../agents/lifecycle.js";
 import { matchRoute } from "./router.js";
+import { selectResponseTier } from "./response-tiers.js";
 import { getOrcastratorDir } from "../config/loader.js";
 import { buildGuardrails, type GuardrailConfig } from "../guardrails/index.js";
 import type { GuardrailsOverride } from "../client/copilot.js";
@@ -98,6 +99,26 @@ export class ChatSession {
     forceAgent?: string,
   ): Promise<ChatTurnResult[]> {
     const start = Date.now();
+
+    // Select response tier
+    const tier = selectResponseTier(userMessage, this.config);
+
+    // Direct tier — respond inline without spawning
+    if (tier.tier === "direct" && !forceAgent) {
+      const response =
+        "👋 I'm the orcastrator coordinator. Use a specific task description to route to the right agent.";
+      this.history.push(
+        { role: "user", content: userMessage, agentName: "coordinator" },
+        { role: "assistant", content: response, agentName: "coordinator" },
+      );
+      return [
+        {
+          agentName: "coordinator",
+          response,
+          duration: Date.now() - start,
+        },
+      ];
+    }
 
     // Route
     const match = forceAgent

@@ -49,6 +49,15 @@ export const LinearConfigSchema = z.object({
   defaultTeam: z.string().optional(),
 });
 
+export const ModelTiersSchema = z.object({
+  /** Model for lightweight tasks (e.g. "claude-haiku-4.5") */
+  fast: z.string().optional(),
+  /** Model for standard tasks — falls back to defaultModel */
+  standard: z.string().optional(),
+  /** Model for complex multi-agent tasks (e.g. "claude-opus-4.6") */
+  premium: z.string().optional(),
+});
+
 export const OrcastratorConfigSchema = z.object({
   name: z.string().default("orcastrator"),
   defaultModel: z.string().default("claude-sonnet-4.6"),
@@ -57,6 +66,7 @@ export const OrcastratorConfigSchema = z.object({
   skills: z.array(z.string()).default([]),
   guardrails: GuardrailInputSchema.optional(),
   linear: LinearConfigSchema.optional(),
+  modelTiers: ModelTiersSchema.optional(),
 });
 
 // ---------------------------------------------------------------------------

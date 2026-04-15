@@ -3,6 +3,7 @@
 import type { AgentConfig, OrcastratorConfig, SpawnResult } from "./types.js";
 import { AgentLifecycleManager } from "../agents/lifecycle.js";
 import type { GuardrailsOverride } from "../client/copilot.js";
+import type { ModelTierSuggestion } from "./response-tiers.js";
 
 export interface FanOutOptions {
   agents: AgentConfig[];
@@ -12,15 +13,16 @@ export interface FanOutOptions {
   lifecycle: AgentLifecycleManager;
   workingDirectory?: string;
   guardrailsOverride?: GuardrailsOverride;
+  modelTier?: ModelTierSuggestion;
 }
 
 export async function fanOut(options: FanOutOptions): Promise<SpawnResult[]> {
-  const { agents, config, orcastratorDir, task, lifecycle, workingDirectory, guardrailsOverride } =
+  const { agents, config, orcastratorDir, task, lifecycle, workingDirectory, guardrailsOverride, modelTier } =
     options;
 
   // Spawn all agents in parallel
   const spawnPromises = agents.map((agent) =>
-    lifecycle.spawnAgent(agent, config, orcastratorDir, task, workingDirectory, guardrailsOverride),
+    lifecycle.spawnAgent(agent, config, orcastratorDir, task, workingDirectory, guardrailsOverride, modelTier),
   );
 
   const spawnResults = await Promise.allSettled(spawnPromises);

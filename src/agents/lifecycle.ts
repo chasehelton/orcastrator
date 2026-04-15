@@ -9,6 +9,7 @@ import type {
   OrcastratorConfig,
   SpawnResult,
 } from "../core/types.js";
+import type { ModelTierSuggestion } from "../core/response-tiers.js";
 import { compileCharter } from "./charter-compiler.js";
 import { resolveModel } from "./model-selector.js";
 import * as copilot from "../client/copilot.js";
@@ -30,6 +31,7 @@ export class AgentLifecycleManager {
     taskContext?: string,
     workingDirectory?: string,
     guardrailsOverride?: GuardrailsOverride,
+    modelTier?: ModelTierSuggestion,
   ): Promise<SpawnResult> {
     const name = agentConfig.name;
 
@@ -52,7 +54,7 @@ export class AgentLifecycleManager {
       });
 
       // Resolve model
-      const model = resolveModel(agentConfig, orcastratorConfig);
+      const model = resolveModel(agentConfig, orcastratorConfig, modelTier);
 
       // Create session
       const session = await copilot.createSession({

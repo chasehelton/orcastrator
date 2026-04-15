@@ -8,6 +8,7 @@ import type {
 } from "./types.js";
 import { matchRoute, determineStrategy } from "./router.js";
 import { fanOut } from "./fan-out.js";
+import { selectResponseTier } from "./response-tiers.js";
 import { AgentLifecycleManager } from "../agents/lifecycle.js";
 import { getOrcastratorDir } from "../config/loader.js";
 import { appendSessionLog } from "../state/log.js";
@@ -45,6 +46,27 @@ export class Coordinator {
     options?: { forceAgent?: string; workingDirectory?: string },
   ): Promise<CoordinatorResult> {
     const start = Date.now();
+
+    // Select response tier
+    const tier = selectResponseTier(task.text, this.config);
+
+    // Direct tier — skip agent spawning entirely
+    if (tier.tier === "direct") {
+      const duration = Date.now() - start;
+      return {
+        strategy: "single",
+        matchedAgents: [],
+        results: [
+          {
+            agentName: "coordinator",
+            success: true,
+            response:
+              "👋 I'm the orcastrator coordinator. Use a specific task description to route to the right agent.",
+          },
+        ],
+        duration,
+      };
+    }
 
     // Route
     let agentNames: string[];
@@ -86,6 +108,7 @@ export class Coordinator {
       lifecycle: this.lifecycle,
       workingDirectory: options?.workingDirectory,
       guardrailsOverride: this.guardrailsOverride,
+      modelTier: tier.modelTier,
     });
 
     const duration = Date.now() - start;
