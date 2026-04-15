@@ -3,9 +3,11 @@
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import chalk from "chalk";
-import { loadConfig, getOrcastratorDir } from "../config/loader.js";
+import { loadConfig } from "../config/loader.js";
 import { ChatSession } from "../core/chat-session.js";
+import type { OrcastratorConfig } from "../core/types.js";
 import { ActivityRenderer, type Verbosity } from "./activity-renderer.js";
+import { playOrcaAnimation } from "./orca-animation.js";
 
 export interface ChatOptions {
   agent?: string;
@@ -37,46 +39,16 @@ export async function chatCommand(options: ChatOptions): Promise<void> {
     }
   });
 
-  // Welcome banner
+  // Welcome banner — animated orca rises from waves, then shows greeting
   const agentNames = config.agents.map((a) => a.name);
   console.log();
-  console.log(chalk.cyan(
-`                            
-                              #@@                             
-                             @@@@                             
-                           *%@@@                              
-                          #@@@@@                              
-                         #@@@@@@@                             
-                       **********@                            
-              ***####################**-                      
-          ######%%#%%%%%%%%%%%%%%%%%%%%%##*                   
-      ###%%%%%%%%%%%%%%%%%%@@@@@@@@%%%%##%%%%#                
-   :#%%%%%%%%%%#%@@@@@@@@@%@@@@@@@@@@@@@@@@@@%%%#             
-  #%%%%@@:  @%%@@@@@@@@@@%@@@@@@@@@@@      @@@@@%%#           
- %%@@@    @@@@@@@@@@@@%@@@@@@@@@@@            @@@@%%#         
-%@@@@@@@@@@@@@@@@@@@@%@@@@@@@@@@       @@@@@@@@@@@@@%%        
-@@@@        %@@@@@@@@@@                       @@@@@@@@%       
-                @@@@@@@@                        @@@@@@@%      
-           %%%%%%@@@@@@@@                         @@@@@@%     
-            *#%%% @@@@@@%%                          @@@@@     
-                    @@@@@@                           :@@@     
-                        @                              .@     
-                                                         @    
-                                                     .. ...@  
-                                                    ........@ 
-                                                   ...@ @.... 
-                                                   @       @.@
-                                                             @`));
+  await playOrcaAnimation();
   console.log();
-  console.log(chalk.bold("🐋 Orcastrator Chat"));
   console.log(
     chalk.dim(
-      `Agents: ${agentNames.join(", ")}` +
+      `  Agents: ${agentNames.join(", ")}` +
         (options.agent ? `  (locked to ${chalk.cyan(options.agent)})` : ""),
     ),
-  );
-  console.log(
-    chalk.dim("Type /help for commands, Ctrl+C or /exit to quit."),
   );
   console.log();
 
@@ -95,7 +67,7 @@ export async function chatCommand(options: ChatOptions): Promise<void> {
 
     // Slash commands
     if (trimmed.startsWith("/")) {
-      const handled = handleSlashCommand(trimmed, session, options);
+      const handled = handleSlashCommand(trimmed, session, options, config);
       if (handled === "exit") break;
       continue;
     }
@@ -141,6 +113,7 @@ function handleSlashCommand(
   input: string,
   session: ChatSession,
   options: ChatOptions,
+  config: OrcastratorConfig,
 ): "exit" | "handled" {
   const [cmd, ...args] = input.split(/\s+/);
 
@@ -171,7 +144,8 @@ function handleSlashCommand(
       return "handled";
     }
 
-    case "/agent": {
+    case "/agent":
+    case "/switch": {
       const name = args[0];
       if (!name) {
         if (options.agent) {
@@ -180,8 +154,14 @@ function handleSlashCommand(
           console.log(chalk.dim("No agent lock — messages are auto-routed."));
         }
       } else {
-        options.agent = name;
-        console.log(chalk.dim(`Locked to agent: ${chalk.cyan(name)}`));
+        const exists = config.agents.some((a) => a.name === name);
+        if (!exists) {
+          const available = config.agents.map((a) => chalk.cyan(a.name)).join(", ");
+          console.log(chalk.yellow(`Unknown agent "${name}". Available: ${available}`));
+        } else {
+          options.agent = name;
+          console.log(chalk.dim(`Locked to agent: ${chalk.cyan(name)}`));
+        }
       }
       return "handled";
     }
@@ -191,15 +171,50 @@ function handleSlashCommand(
       console.log(chalk.dim("Switched to auto-routing."));
       return "handled";
 
+    case "/status": {
+      const history = session.getHistory();
+      const respondedAgents = [
+        ...new Set(
+          history
+            .filter((t) => t.role === "assistant" && t.agentName !== "coordinator")
+            .map((t) => t.agentName),
+        ),
+      ];
+      console.log();
+      console.log(chalk.bold("Session status:"));
+      console.log(
+        `  Routing   ${
+          options.agent
+            ? chalk.cyan(options.agent) + chalk.dim(" (locked)")
+            : chalk.dim("auto")
+        }`,
+      );
+      console.log(
+        `  History   ${session.historyLength} turn${session.historyLength !== 1 ? "s" : ""}`,
+      );
+      console.log(
+        `  Agents    ${config.agents.map((a) => chalk.cyan(a.name)).join(", ")}`,
+      );
+      if (respondedAgents.length > 0) {
+        console.log(
+          `  Active    ${respondedAgents.map((a) => chalk.green(a)).join(", ")}`,
+        );
+      }
+      console.log();
+      return "handled";
+    }
+
     case "/help":
       console.log();
       console.log(chalk.bold("Commands:"));
-      console.log(`  ${chalk.cyan("/help")}          Show this help`);
-      console.log(`  ${chalk.cyan("/exit")}          Exit the chat`);
-      console.log(`  ${chalk.cyan("/clear")}         Clear conversation history`);
-      console.log(`  ${chalk.cyan("/history")}       Show conversation history`);
-      console.log(`  ${chalk.cyan("/agent <name>")} Lock to a specific agent`);
-      console.log(`  ${chalk.cyan("/auto")}          Switch back to auto-routing`);
+      console.log(`  ${chalk.cyan("/help")}              Show this help`);
+      console.log(`  ${chalk.cyan("/exit")}              Exit the chat`);
+      console.log(`  ${chalk.cyan("/clear")}             Clear conversation history`);
+      console.log(`  ${chalk.cyan("/history")}           Show conversation history`);
+      console.log(`  ${chalk.cyan("/status")}            Show session status and active agents`);
+      console.log(`  ${chalk.cyan("/agent <name>")}     Lock to a specific agent`);
+      console.log(`  ${chalk.cyan("/switch <name>")}    Alias for /agent`);
+      console.log(`  ${chalk.cyan("/auto")}              Switch back to auto-routing`);
       console.log();
       return "handled";
 

@@ -13,6 +13,9 @@ import { selectResponseTier } from "./response-tiers.js";
 import { AgentLifecycleManager } from "../agents/lifecycle.js";
 import { getOrcastratorDir } from "../config/loader.js";
 import { appendSessionLog } from "../state/log.js";
+import { appendHistory } from "../state/history.js";
+import { SkillRegistry } from "../skills/registry.js";
+import type { SkillContext } from "../skills/types.js";
 import { randomUUID } from "node:crypto";
 import { buildGuardrails, type GuardrailConfig } from "../guardrails/index.js";
 import type { GuardrailsOverride } from "../client/copilot.js";
@@ -29,10 +32,14 @@ export class Coordinator {
   private config: OrcastratorConfig;
   private lifecycle: AgentLifecycleManager;
   private orcastratorDir: string;
+  private cwd: string;
   private guardrailsOverride: GuardrailsOverride | undefined;
+  private skillRegistry: SkillRegistry;
+  private skillRegistryReady: Promise<void>;
 
   constructor(config: OrcastratorConfig, cwd?: string) {
     this.config = config;
+    this.cwd = cwd ?? process.cwd();
     this.lifecycle = new AgentLifecycleManager();
     this.orcastratorDir = getOrcastratorDir(cwd);
 
@@ -41,6 +48,15 @@ export class Coordinator {
     this.guardrailsOverride = guardrailConfig
       ? buildGuardrails(guardrailConfig)
       : undefined;
+
+    // Wire skill registry — setupAll() is async so we store the promise and
+    // await it before the first fan-out to ensure skills are ready.
+    this.skillRegistry = new SkillRegistry();
+    const skillContext: SkillContext = {
+      workingDirectory: this.cwd,
+      orcastratorDir: this.orcastratorDir,
+    };
+    this.skillRegistryReady = this.skillRegistry.setupAll(skillContext);
   }
 
   async handleTask(
@@ -108,6 +124,9 @@ export class Coordinator {
 
     bus.emit("task.started", { task: task.text, agents: agentNames });
 
+    // Ensure programmatic skills are set up before spawning agents
+    await this.skillRegistryReady;
+
     // Load and match skills
     const allSkills = loadSkillFiles(this.orcastratorDir);
     const matchedSkills = matchSkills(task.text, allSkills);
@@ -133,6 +152,22 @@ export class Coordinator {
       agentCount: agentConfigs.length,
     });
 
+    // Persist per-agent history so future charters carry forward learnings
+    const historyTimestamp = new Date().toISOString();
+    for (const result of results) {
+      if (result.success && result.response) {
+        try {
+          appendHistory(this.orcastratorDir, result.agentName, {
+            timestamp: historyTimestamp,
+            task: task.text,
+            outcome: result.response,
+          });
+        } catch {
+          // Don't fail the task if history writing fails
+        }
+      }
+    }
+
     // Log the session
     const log: SessionLog = {
       id: randomUUID(),
@@ -155,5 +190,6 @@ export class Coordinator {
 
   async shutdown(): Promise<void> {
     await this.lifecycle.shutdown();
+    await this.skillRegistry.teardownAll();
   }
 }
