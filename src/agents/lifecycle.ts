@@ -12,6 +12,7 @@ import type {
 import type { ModelTierSuggestion } from "../core/response-tiers.js";
 import { compileCharter } from "./charter-compiler.js";
 import { resolveModel } from "./model-selector.js";
+import { attachEventRelay } from "./event-relay.js";
 import * as copilot from "../client/copilot.js";
 import type { GuardrailsOverride } from "../client/copilot.js";
 import type { SkillFile } from "../skills/loader.js";
@@ -20,6 +21,7 @@ interface ManagedAgent {
   handle: AgentHandle;
   session: CopilotSession;
   config: AgentConfig;
+  detachRelay: () => void;
 }
 
 export class AgentLifecycleManager {
@@ -70,7 +72,9 @@ export class AgentLifecycleManager {
       handle.sessionId = session.sessionId;
       handle.status = "active";
 
-      this.agents.set(name, { handle, session, config: agentConfig });
+      const detachRelay = attachEventRelay(session, name);
+
+      this.agents.set(name, { handle, session, config: agentConfig, detachRelay });
 
       return {
         agentName: name,
@@ -104,6 +108,7 @@ export class AgentLifecycleManager {
     const managed = this.agents.get(agentName);
     if (!managed) return;
 
+    managed.detachRelay();
     managed.handle.status = "destroyed";
     await copilot.closeSession(managed.session);
     this.agents.delete(agentName);

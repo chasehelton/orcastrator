@@ -67,12 +67,16 @@ program
   .option("-a, --agent <name>", "Force routing to a specific agent")
   .option("--pr", "Create a PR when done")
   .option("--dry-run", "Show routing without executing")
+  .option("-q, --quiet", "Minimal output (spinner only)")
+  .option("-v, --verbose", "Show detailed tool call information")
   .action(runCommand);
 
 program
   .command("chat")
   .description("Start an interactive multi-turn chat session")
   .option("-a, --agent <name>", "Lock to a specific agent (bypass routing)")
+  .option("-q, --quiet", "Minimal output (no activity panel)")
+  .option("-v, --verbose", "Show detailed tool call information")
   .action(chatCommand);
 
 program

@@ -5,9 +5,12 @@ import { stdin as input, stdout as output } from "node:process";
 import chalk from "chalk";
 import { loadConfig, getOrcastratorDir } from "../config/loader.js";
 import { ChatSession } from "../core/chat-session.js";
+import { ActivityRenderer, type Verbosity } from "./activity-renderer.js";
 
 export interface ChatOptions {
   agent?: string;
+  quiet?: boolean;
+  verbose?: boolean;
 }
 
 export async function chatCommand(options: ChatOptions): Promise<void> {
@@ -99,7 +102,13 @@ export async function chatCommand(options: ChatOptions): Promise<void> {
 
     // Send to agent(s)
     try {
+      const verbosity: Verbosity = options.quiet ? "quiet" : options.verbose ? "verbose" : "normal";
+      const renderer = new ActivityRenderer({ verbosity, clearBehavior: "clear" });
+      renderer.start();
+
       const results = await session.send(trimmed, options.agent);
+
+      renderer.stop();
 
       for (const r of results) {
         if (r.error) {

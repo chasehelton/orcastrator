@@ -48,6 +48,10 @@ npx orcastrator list
 | `orcastrator init --default` | Scaffold config with default agent template |
 | `orcastrator build` | Generate markdown from config |
 | `orcastrator run "<task>"` | Execute an ad-hoc task |
+| `orcastrator run "<task>" -v` | Execute with verbose activity panel |
+| `orcastrator run "<task>" -q` | Execute with minimal output (spinner only) |
+| `orcastrator chat` | Start an interactive multi-turn chat session |
+| `orcastrator chat -v` | Chat with verbose activity panel |
 | `orcastrator issue <number>` | Work on a GitHub issue (e.g. `42`) |
 | `orcastrator issue <identifier>` | Work on a Linear issue (e.g. `ENG-123`) |
 | `orcastrator list` | List open issues (Linear or GitHub) |
@@ -154,6 +158,48 @@ Orcastrator emits typed events during task execution for observability and tooli
 | `agent.spawned` | `{ agent, model }` |
 | `agent.completed` | `{ agent, duration }` |
 | `task.completed` | `{ task, agents, duration }` |
+| `agent.intent` | `{ agentName, intent }` |
+| `agent.turn.start` | `{ agentName, turnId }` |
+| `agent.turn.end` | `{ agentName, turnId }` |
+| `agent.tool.start` | `{ agentName, toolCallId, toolName, args? }` |
+| `agent.tool.progress` | `{ agentName, toolCallId, message }` |
+| `agent.tool.complete` | `{ agentName, toolCallId, toolName, success, snippet? }` |
+| `agent.subagent.started` | `{ agentName, subagentName, description }` |
+
+The `agent.*` events are relayed from Copilot SDK session events via the **EventRelay** (`src/agents/event-relay.ts`), which auto-attaches to every agent session. These events power the live activity panel in the CLI.
+
+## Activity Panel
+
+When agents are working, the CLI displays a live activity panel showing what each agent is doing in real-time:
+
+```
+  ┌ backend-dev ──────────────────────────
+  │ ⚡ Reading src/api/routes.ts
+  │    Turn 3 · 2 tool calls · 12s
+  └──────────────────────────────────────
+```
+
+Multi-agent tasks show stacked panels:
+
+```
+  ┌ backend-dev ──────────────────────────
+  │ ✏️ Editing src/api/routes.ts
+  │    Turn 5 · 8 tool calls · 24s
+  ├ frontend-dev ─────────────────────────
+  │ 🔍 Searching for component usage
+  │    Turn 2 · 3 tool calls · 18s
+  └──────────────────────────────────────
+```
+
+### Verbosity levels
+
+| Flag | Behavior |
+|------|----------|
+| (default) | Activity panel with intent, tool names, turn count, timing |
+| `-v, --verbose` | Panel + truncated tool arguments |
+| `-q, --quiet` | Spinner only (for CI or piping) |
+
+In `run` mode the panel persists as a summary after completion. In `chat` mode it clears when the response arrives.
 
 ## Architecture
 
@@ -170,13 +216,21 @@ User (CLI)
 ┌──────────────────────────────────┐
 │    Agent Lifecycle Manager       │
 │  Charter compile → Session       │
-│  create → Send task → Collect    │
+│  create → Attach relay → Send    │
 └──────────┬───────────────────────┘
-           │
-           ▼
-┌──────────────────────────────────┐
-│      GitHub Copilot SDK          │
-└──────────────────────────────────┘
+           │         │
+           ▼         ▼
+┌─────────────┐  ┌─────────────────┐
+│ Copilot SDK │  │  Event Relay    │
+│             │──│  SDK events →   │
+│             │  │  OrcaEventBus   │
+└─────────────┘  └────────┬────────┘
+                          │
+                          ▼
+                 ┌─────────────────┐
+                 │ActivityRenderer  │
+                 │ Live TUI panel  │
+                 └─────────────────┘
 ```
 
 ## Requirements

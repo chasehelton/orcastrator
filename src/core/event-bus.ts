@@ -12,6 +12,34 @@ export interface OrcaEvents {
     duration?: number;
   };
   "task.completed": { strategy: string; duration: number; agentCount: number };
+
+  // Agent activity events (relayed from SDK session events)
+  "agent.intent": { agentName: string; intent: string };
+  "agent.turn.start": { agentName: string; turnId: string };
+  "agent.turn.end": { agentName: string; turnId: string };
+  "agent.tool.start": {
+    agentName: string;
+    toolCallId: string;
+    toolName: string;
+    args?: string;
+  };
+  "agent.tool.progress": {
+    agentName: string;
+    toolCallId: string;
+    message: string;
+  };
+  "agent.tool.complete": {
+    agentName: string;
+    toolCallId: string;
+    toolName: string;
+    success: boolean;
+    snippet?: string;
+  };
+  "agent.subagent.started": {
+    agentName: string;
+    subagentName: string;
+    description: string;
+  };
 }
 
 type EventName = keyof OrcaEvents;

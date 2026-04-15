@@ -13,11 +13,14 @@ import {
   taskSlug,
 } from "../git/worktree.js";
 import { commitAndPush, createPr } from "../github/pr.js";
+import { ActivityRenderer, type Verbosity } from "./activity-renderer.js";
 
 export interface RunOptions {
   agent?: string;
   pr?: boolean;
   dryRun?: boolean;
+  quiet?: boolean;
+  verbose?: boolean;
 }
 
 export async function runCommand(
@@ -73,10 +76,14 @@ export async function runCommand(
   }
 
   // Execute
-  const spinner = ora({
-    text: `Working with ${match.agents.join(", ")}...`,
-    color: "cyan",
-  }).start();
+  const verbosity: Verbosity = options.quiet ? "quiet" : options.verbose ? "verbose" : "normal";
+  const renderer = new ActivityRenderer({ verbosity, clearBehavior: "persist" });
+
+  // Fall back to a simple spinner in quiet mode
+  const spinner = verbosity === "quiet"
+    ? ora({ text: `Working with ${match.agents.join(", ")}...`, color: "cyan" }).start()
+    : null;
+  if (!spinner) renderer.start();
 
   const coordinator = new Coordinator(config, cwd);
 
@@ -86,7 +93,8 @@ export async function runCommand(
       workingDirectory: worktreePath,
     });
 
-    spinner.stop();
+    if (spinner) spinner.stop();
+    else renderer.stop();
 
     // Display results
     for (const r of result.results) {
@@ -130,7 +138,8 @@ export async function runCommand(
     console.log();
     console.log(chalk.dim(`Done in ${(result.duration / 1000).toFixed(1)}s`));
   } catch (err) {
-    spinner.fail("Task failed");
+    if (spinner) spinner.fail("Task failed");
+    else renderer.stop();
     if (worktreePath) pruneWorktree(cwd, worktreePath);
     console.error(chalk.red(err instanceof Error ? err.message : String(err)));
     process.exitCode = 1;

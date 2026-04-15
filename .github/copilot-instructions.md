@@ -29,10 +29,14 @@ CLI (src/cli/)  →  Coordinator (src/core/coordinator.ts)
                    Promise.allSettled → parallel agent spawning
                        │
                    AgentLifecycleManager (src/agents/lifecycle.ts)
-                   Compile charter → create session → send task
-                       │
-                   CopilotClient (src/client/copilot.ts)
-                   Singleton wrapper around @github/copilot-sdk
+                   Compile charter → create session → attach event relay → send task
+                       │                                    │
+                   CopilotClient (src/client/copilot.ts)    EventRelay (src/agents/event-relay.ts)
+                   Singleton wrapper around                 Bridges SDK session events →
+                   @github/copilot-sdk                      OrcaEventBus for live display
+                                                            │
+                                                        ActivityRenderer (src/cli/activity-renderer.ts)
+                                                        Renders live per-agent TUI panel via log-update
 ```
 
 **Data flow:**
@@ -40,14 +44,17 @@ CLI (src/cli/)  →  Coordinator (src/core/coordinator.ts)
 2. The router matches task text against regex rules → returns agent names
 3. `fanOut` spawns all matched agents in parallel via `Promise.allSettled`
 4. Each agent receives a compiled charter (its system prompt) built from: agent config + team context + `.orcastrator/decisions.md` + per-agent `.orcastrator/agents/<name>/history.md`
-5. Session logs are written to `.orcastrator/log/` as JSON
+5. The **EventRelay** auto-attaches to every SDK session and bridges events (`assistant.intent`, `tool.execution_start/complete`, `subagent.started`, etc.) to the `OrcaEventBus`
+6. The **ActivityRenderer** subscribes to the bus and renders a live terminal panel showing per-agent intent, active tool, turn count, and timing
+7. Session logs are written to `.orcastrator/log/` as JSON
 
 **Module responsibilities:**
 - `src/core/` — Coordinator, router, fan-out, event bus, shared types
-- `src/agents/` — Lifecycle manager, charter compiler, model selector
+- `src/agents/` — Lifecycle manager, charter compiler, model selector, event relay
 - `src/client/copilot.ts` — Singleton `CopilotClient` wrapper; never instantiate directly
 - `src/config/builder.ts` — Public package API (`defineOrcastrator`, `defineAgent`, `defineRouting`); Zod schemas live here
 - `src/cli/` — One file per command; delegates all logic to core
+- `src/cli/activity-renderer.ts` — Live terminal activity panel; renders per-agent boxes via `log-update`
 - `src/guardrails/` — Permission handler, session hooks, policy enforcement
 - `src/skills/` — Skill loader, registry, and types; markdown-based plugins from `.orcastrator/skills/`
 - `src/git/` + `src/github/` + `src/linear/` — External integrations
@@ -97,3 +104,12 @@ Core types in `src/core/types.ts` are `z.infer<>` aliases of schemas defined in 
 
 ### Secrets
 `LINEAR_API_KEY` and `GITHUB_TOKEN` are read from env vars (also loaded from `.env` / `.env.local` at startup in `src/index.ts`). Never commit API keys to `orcastrator.config.ts`.
+
+### Event relay pattern
+`src/agents/event-relay.ts` bridges Copilot SDK session events to the `OrcaEventBus`. The relay is auto-attached to every agent session in `AgentLifecycleManager.spawnAgent()` and detached on `destroyAgent()`. To add visibility for a new SDK event type:
+1. Add the event to `OrcaEvents` in `src/core/event-bus.ts`
+2. Add a `session.on(eventType, handler)` subscription in `attachEventRelay()`
+3. The `ActivityRenderer` will pick it up if you handle it in its `subscribe()` method
+
+### Activity renderer
+`src/cli/activity-renderer.ts` renders a live terminal panel via `log-update`. It supports three verbosity levels (`quiet`/`normal`/`verbose`) and two clear behaviors (`persist` for `run`, `clear` for `chat`). The `run` command uses it instead of a bare `ora` spinner; the `chat` command creates a fresh instance per message.
