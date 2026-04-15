@@ -53,6 +53,13 @@ npx orcastrator list
 | `orcastrator list` | List open issues (Linear or GitHub) |
 | `orcastrator list --provider linear --team ENG` | List open Linear issues for a team |
 | `orcastrator list --mine` | List issues assigned to you |
+| `orcastrator doctor` | Check environment and config health |
+| `orcastrator nap` | Compress history and prune old logs |
+| `orcastrator nap --dry-run` | Preview what `nap` would clean |
+| `orcastrator nap --keep <n>` | Keep last N history entries (default: 20) |
+| `orcastrator export [file]` | Export config + state to a JSON snapshot |
+| `orcastrator import <file>` | Import config + state from a snapshot |
+| `orcastrator import <file> --no-merge` | Overwrite instead of merging |
 | `orcastrator status` | Show agents, routing, and recent sessions |
 | `orcastrator agents list` | List configured agents |
 
@@ -91,10 +98,18 @@ export default defineOrcastrator({
     defaultAgent: "builder",
   }),
 
+  // Optional: tiered model selection
+  modelTiers: {
+    fast: "claude-haiku-4.5",       // lightweight tasks
+    standard: "claude-sonnet-4.6",  // default (falls back to defaultModel)
+    premium: "claude-opus-4.6",     // complex multi-agent tasks
+  },
+
+  // Optional: enable skills loaded from .orcastrator/skills/
+  skills: ["code-review", "testing"],
+
   // Optional: configure Linear integration
   linear: {
-    // Defaults to LINEAR_API_KEY env var — prefer the env var to avoid committing secrets
-    // apiKey: "lin_api_...",
     defaultTeam: "ENG",  // Used by `orcastrator list` when no --team flag is given
   },
 });
@@ -109,6 +124,36 @@ export default defineOrcastrator({
 When working on a Linear issue, orcastrator will automatically:
 - Mark the issue **In Progress** when work starts
 - Post a PR comment and mark the issue **In Review** when a PR is created (`--pr` flag)
+
+## Skills
+
+Skills are markdown-based plugins loaded from `.orcastrator/skills/`. Each skill is a `SKILL.md` file with YAML frontmatter:
+
+```markdown
+---
+name: code-review
+domain: quality
+triggers:
+  - review
+  - lint
+---
+
+You are a code review specialist...
+```
+
+Skills are matched against task text via their `triggers` regex patterns and injected into agent charters automatically. Enable skills in your config with the `skills` array.
+
+## Event Bus
+
+Orcastrator emits typed events during task execution for observability and tooling:
+
+| Event | Payload |
+|-------|---------|
+| `tier.selected` | `{ tier, model, reason }` |
+| `task.started` | `{ task }` |
+| `agent.spawned` | `{ agent, model }` |
+| `agent.completed` | `{ agent, duration }` |
+| `task.completed` | `{ task, agents, duration }` |
 
 ## Architecture
 
