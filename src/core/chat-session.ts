@@ -12,6 +12,7 @@ import { selectResponseTier } from "./response-tiers.js";
 import { getOrcastratorDir } from "../config/loader.js";
 import { buildGuardrails, type GuardrailConfig } from "../guardrails/index.js";
 import type { GuardrailsOverride } from "../client/copilot.js";
+import { bus } from "./event-bus.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -102,6 +103,11 @@ export class ChatSession {
 
     // Select response tier
     const tier = selectResponseTier(userMessage, this.config);
+    bus.emit("tier.selected", {
+      task: userMessage,
+      tier: tier.tier,
+      reason: `matched tier: ${tier.tier}`,
+    });
 
     // Direct tier — respond inline without spawning
     if (tier.tier === "direct" && !forceAgent) {
@@ -124,6 +130,10 @@ export class ChatSession {
     const match = forceAgent
       ? { agents: [forceAgent], confidence: "exact" as const }
       : matchRoute(userMessage, this.config);
+
+    const agentNames = match.agents;
+
+    bus.emit("task.started", { task: userMessage, agents: agentNames });
 
     // Resolve agent configs, falling back to the default agent if nothing matched
     let agentConfigs = match.agents
@@ -202,6 +212,12 @@ export class ChatSession {
         }
       }),
     );
+
+    bus.emit("task.completed", {
+      strategy: "multi",
+      duration: Date.now() - start,
+      agentCount: agentConfigs.length,
+    });
 
     return results;
   }

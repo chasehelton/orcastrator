@@ -2,16 +2,18 @@
 
 import type { AgentConfig, OrcastratorConfig } from "../core/types.js";
 import { readDecisions, readAgentHistory } from "../config/generator.js";
+import type { SkillFile } from "../skills/loader.js";
 
 export interface CompileCharterOptions {
   agent: AgentConfig;
   config: OrcastratorConfig;
   orcastratorDir: string;
   taskContext?: string;
+  skills?: SkillFile[];
 }
 
 export function compileCharter(options: CompileCharterOptions): string {
-  const { agent, config, orcastratorDir, taskContext } = options;
+  const { agent, config, orcastratorDir, taskContext, skills } = options;
 
   const sections: string[] = [];
 
@@ -44,6 +46,16 @@ export function compileCharter(options: CompileCharterOptions): string {
       );
     }
     sections.push("");
+  }
+
+  // Relevant skills
+  if (skills && skills.length > 0) {
+    sections.push("## Relevant Skills");
+    for (const skill of skills) {
+      sections.push(`### ${skill.meta.name} (${skill.meta.domain})`);
+      sections.push(skill.body);
+      sections.push("");
+    }
   }
 
   // Recent decisions

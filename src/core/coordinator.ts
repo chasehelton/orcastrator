@@ -8,6 +8,7 @@ import type {
 } from "./types.js";
 import { matchRoute, determineStrategy } from "./router.js";
 import { fanOut } from "./fan-out.js";
+import { loadSkillFiles, matchSkills } from "../skills/loader.js";
 import { selectResponseTier } from "./response-tiers.js";
 import { AgentLifecycleManager } from "../agents/lifecycle.js";
 import { getOrcastratorDir } from "../config/loader.js";
@@ -15,6 +16,7 @@ import { appendSessionLog } from "../state/log.js";
 import { randomUUID } from "node:crypto";
 import { buildGuardrails, type GuardrailConfig } from "../guardrails/index.js";
 import type { GuardrailsOverride } from "../client/copilot.js";
+import { bus } from "./event-bus.js";
 
 export interface CoordinatorResult {
   strategy: "single" | "multi" | "fallback";
@@ -49,6 +51,11 @@ export class Coordinator {
 
     // Select response tier
     const tier = selectResponseTier(task.text, this.config);
+    bus.emit("tier.selected", {
+      task: task.text,
+      tier: tier.tier,
+      reason: `matched tier: ${tier.tier}`,
+    });
 
     // Direct tier — skip agent spawning entirely
     if (tier.tier === "direct") {
@@ -99,6 +106,12 @@ export class Coordinator {
       }
     }
 
+    bus.emit("task.started", { task: task.text, agents: agentNames });
+
+    // Load and match skills
+    const allSkills = loadSkillFiles(this.orcastratorDir);
+    const matchedSkills = matchSkills(task.text, allSkills);
+
     // Fan out
     const results = await fanOut({
       agents: agentConfigs,
@@ -109,9 +122,16 @@ export class Coordinator {
       workingDirectory: options?.workingDirectory,
       guardrailsOverride: this.guardrailsOverride,
       modelTier: tier.modelTier,
+      skills: matchedSkills,
     });
 
     const duration = Date.now() - start;
+
+    bus.emit("task.completed", {
+      strategy,
+      duration,
+      agentCount: agentConfigs.length,
+    });
 
     // Log the session
     const log: SessionLog = {

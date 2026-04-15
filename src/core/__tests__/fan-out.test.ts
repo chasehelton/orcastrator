@@ -71,6 +71,7 @@ describe("fanOut", () => {
       options.workingDirectory,
       options.guardrailsOverride,
       options.modelTier,
+      options.skills,
     );
     expect(lifecycle.sendTask).toHaveBeenCalledWith("test-agent", options.task);
   });
@@ -210,7 +211,7 @@ describe("fanOut", () => {
 
     expect(lifecycle.spawnAgent).toHaveBeenCalledWith(
       expect.any(Object), expect.any(Object), expect.any(String), expect.any(String),
-      undefined, guardrailsOverride, modelTier,
+      undefined, guardrailsOverride, modelTier, undefined,
     );
   });
 
@@ -223,7 +224,7 @@ describe("fanOut", () => {
 
     expect(lifecycle.spawnAgent).toHaveBeenCalledWith(
       expect.any(Object), expect.any(Object), expect.any(String), expect.any(String),
-      "/custom/dir", undefined, undefined,
+      "/custom/dir", undefined, undefined, undefined,
     );
   });
 

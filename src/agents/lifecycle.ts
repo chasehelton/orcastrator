@@ -14,6 +14,7 @@ import { compileCharter } from "./charter-compiler.js";
 import { resolveModel } from "./model-selector.js";
 import * as copilot from "../client/copilot.js";
 import type { GuardrailsOverride } from "../client/copilot.js";
+import type { SkillFile } from "../skills/loader.js";
 
 interface ManagedAgent {
   handle: AgentHandle;
@@ -32,6 +33,7 @@ export class AgentLifecycleManager {
     workingDirectory?: string,
     guardrailsOverride?: GuardrailsOverride,
     modelTier?: ModelTierSuggestion,
+    skills?: SkillFile[],
   ): Promise<SpawnResult> {
     const name = agentConfig.name;
 
@@ -51,6 +53,7 @@ export class AgentLifecycleManager {
         config: orcastratorConfig,
         orcastratorDir,
         taskContext,
+        skills,
       });
 
       // Resolve model

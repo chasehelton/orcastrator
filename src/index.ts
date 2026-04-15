@@ -34,6 +34,10 @@ import { issueCommand } from "./cli/issue.js";
 import { issueListCommand } from "./cli/list.js";
 import { statusCommand } from "./cli/status.js";
 import { agentsCommand } from "./cli/agents.js";
+import { napCommand } from "./cli/nap.js";
+import { exportCommand } from "./cli/export.js";
+import { importCommand } from "./cli/import-config.js";
+import { doctorCommand } from "./cli/doctor.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json");
@@ -100,5 +104,28 @@ program
   .description("Manage your agent team")
   .argument("[action]", "Action to perform", "list")
   .action(agentsCommand);
+
+program
+  .command("nap")
+  .description("Compress history and prune old logs")
+  .option("--dry-run", "Show what would be cleaned without making changes")
+  .option("--keep <n>", "Number of history entries to keep", "20")
+  .action(napCommand);
+
+program
+  .command("doctor")
+  .description("Check environment and configuration health")
+  .action(doctorCommand);
+
+program
+  .command("export [output]")
+  .description("Export configuration and state to a portable snapshot")
+  .action(exportCommand);
+
+program
+  .command("import <file>")
+  .description("Import configuration and state from a snapshot")
+  .option("--merge", "Merge with existing state instead of overwriting", true)
+  .action(importCommand);
 
 program.parse();
