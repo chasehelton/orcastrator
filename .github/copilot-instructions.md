@@ -60,6 +60,7 @@ CLI (src/cli/)  →  Coordinator (src/core/coordinator.ts)
 - `src/git/` + `src/github/` + `src/linear/` — External integrations
 - `src/state/` — Read/write `.orcastrator/` state files
 - `src/init/` + `src/config/generator.ts` — `orcastrator init` / `orcastrator build` logic
+- `src/init/agent-creator.ts` — `orcastrator agents create` logic: builds the Copilot prompt with existing team context, parses the JSON response (with one auto-retry on bad JSON), writes the updated config source, and re-runs `build` in-memory to avoid the ESM module cache
 
 **`.orcastrator/` directory** (runtime state, committed to git):
 - `decisions.md` — shared team decisions injected into every agent's system prompt
@@ -113,3 +114,12 @@ Core types in `src/core/types.ts` are `z.infer<>` aliases of schemas defined in 
 
 ### Activity renderer
 `src/cli/activity-renderer.ts` renders a live terminal panel via `log-update`. It supports three verbosity levels (`quiet`/`normal`/`verbose`) and two clear behaviors (`persist` for `run`, `clear` for `chat`). The `run` command uses it instead of a bare `ora` spinner; the `chat` command creates a fresh instance per message.
+
+### agents create flow
+`orcastrator agents create "<description>"` is a Copilot-powered wizard:
+1. Load existing config and build a prompt via `buildAgentCreatePrompt()` in `src/init/agent-creator.ts` — the prompt includes the full existing team and routing rules as context
+2. Call Copilot; parse the JSON response with `parseNewAgentResponse()` (one auto-retry with a stricter follow-up prompt on bad JSON)
+3. Print a preview of the new agent and its routing rules
+4. Ask the user for confirmation (Y/n)
+5. Rewrite `orcastrator.config.ts` via `generateUpdatedConfigSource()`
+6. Run `buildCommand()` in-memory with the updated config object (bypasses the ESM module cache — never re-import the config file after rewriting it)

@@ -16,10 +16,12 @@ export interface FanOutOptions {
   guardrailsOverride?: GuardrailsOverride;
   modelTier?: ModelTierSuggestion;
   skills?: SkillFile[];
+  /** Per-agent timeout in milliseconds. Falls back to sendMessage default if omitted. */
+  timeoutMs?: number;
 }
 
 export async function fanOut(options: FanOutOptions): Promise<SpawnResult[]> {
-  const { agents, config, orcastratorDir, task, lifecycle, workingDirectory, guardrailsOverride, modelTier, skills } =
+  const { agents, config, orcastratorDir, task, lifecycle, workingDirectory, guardrailsOverride, modelTier, skills, timeoutMs } =
     options;
 
   // Spawn all agents in parallel
@@ -48,7 +50,7 @@ export async function fanOut(options: FanOutOptions): Promise<SpawnResult[]> {
     .filter((r) => r.success)
     .map(async (r) => {
       try {
-        const response = await lifecycle.sendTask(r.agentName, task);
+        const response = await lifecycle.sendTask(r.agentName, task, timeoutMs);
         r.response = response;
       } catch (err) {
         r.error = err instanceof Error ? err.message : String(err);

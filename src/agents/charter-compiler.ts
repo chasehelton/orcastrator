@@ -68,10 +68,14 @@ export function compileCharter(options: CompileCharterOptions): string {
 
   // Agent's own history
   const history = readAgentHistory(orcastratorDir, agent.name);
-  if (history && !history.startsWith(`# ${agent.name} — History\n\n`?.trimEnd())) {
-    sections.push("## What You've Learned About This Project");
-    sections.push(history.trim());
-    sections.push("");
+  if (history) {
+    // Strip the generated header so we only include actual entries
+    const stripped = history.replace(/^#\s.*?—\s*History\s*/, "").trim();
+    if (stripped.length > 0) {
+      sections.push("## What You've Learned About This Project");
+      sections.push(stripped);
+      sections.push("");
+    }
   }
 
   // Task context

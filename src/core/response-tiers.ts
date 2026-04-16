@@ -31,15 +31,15 @@ const TIERS: Record<TierName, ResponseTier> = {
     tier: "lightweight",
     modelTier: "fast",
     maxAgents: 1,
-    timeout: 30,
+    timeout: 60,
   },
   standard: {
     tier: "standard",
     modelTier: "standard",
     maxAgents: 1,
-    timeout: 120,
+    timeout: 300,
   },
-  full: { tier: "full", modelTier: "premium", maxAgents: 5, timeout: 300 },
+  full: { tier: "full", modelTier: "premium", maxAgents: 5, timeout: 600 },
 };
 
 export function getTier(name: TierName): ResponseTier {

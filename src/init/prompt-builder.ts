@@ -2,6 +2,7 @@
 
 import type { RepoContext } from "./repo-scanner.js";
 import { contextToPromptPayload } from "./repo-scanner.js";
+import { extractJSON } from "./json-extractor.js";
 
 const RESPONSE_SCHEMA = `{
   "projectName": "string (kebab-case, e.g. 'my-project')",
@@ -91,35 +92,25 @@ export interface GeneratedRoutingRule {
 }
 
 export function parseGeneratedConfig(raw: string): GeneratedConfig {
-  const jsonMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  const jsonStr = jsonMatch ? jsonMatch[1].trim() : raw.trim();
+  const parsed = extractJSON(raw) as unknown as GeneratedConfig;
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonStr);
-  } catch {
-    throw new Error("Failed to parse Copilot response as JSON. The model did not return valid JSON.");
-  }
-
-  const config = parsed as GeneratedConfig;
-
-  if (!config.agents || !Array.isArray(config.agents) || config.agents.length === 0) {
+  if (!parsed.agents || !Array.isArray(parsed.agents) || parsed.agents.length === 0) {
     throw new Error("Generated config has no agents.");
   }
 
-  if (!config.routing || !config.routing.defaultAgent) {
+  if (!parsed.routing || !parsed.routing.defaultAgent) {
     throw new Error("Generated config is missing routing configuration.");
   }
 
-  const agentNames = new Set(config.agents.map((a) => a.name));
+  const agentNames = new Set(parsed.agents.map((a) => a.name));
 
-  if (!agentNames.has(config.routing.defaultAgent)) {
+  if (!agentNames.has(parsed.routing.defaultAgent)) {
     throw new Error(
-      `Default agent "${config.routing.defaultAgent}" not found in agents: ${[...agentNames].join(", ")}`,
+      `Default agent "${parsed.routing.defaultAgent}" not found in agents: ${[...agentNames].join(", ")}`,
     );
   }
 
-  for (const rule of config.routing.rules) {
+  for (const rule of parsed.routing.rules) {
     for (const agent of rule.agents) {
       if (!agentNames.has(agent)) {
         throw new Error(
@@ -129,7 +120,7 @@ export function parseGeneratedConfig(raw: string): GeneratedConfig {
     }
   }
 
-  for (const agent of config.agents) {
+  for (const agent of parsed.agents) {
     if (!/^[a-z][a-z0-9-]*$/.test(agent.name)) {
       throw new Error(
         `Invalid agent name "${agent.name}". Must be lowercase alphanumeric with hyphens.`,
@@ -138,9 +129,9 @@ export function parseGeneratedConfig(raw: string): GeneratedConfig {
   }
 
   return {
-    projectName: config.projectName || "my-project",
-    defaultModel: config.defaultModel || "claude-sonnet-4.6",
-    agents: config.agents,
-    routing: config.routing,
+    projectName: parsed.projectName || "my-project",
+    defaultModel: parsed.defaultModel || "claude-sonnet-4.6",
+    agents: parsed.agents,
+    routing: parsed.routing,
   };
 }
