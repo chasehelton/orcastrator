@@ -106,7 +106,8 @@ program
 program
   .command("agents")
   .description("Manage your agent team")
-  .argument("[action]", "Action to perform", "list")
+  .argument("[action]", "Action to perform (list, create)", "list")
+  .argument("[description]", "Agent description (for create)")
   .action(agentsCommand);
 
 program

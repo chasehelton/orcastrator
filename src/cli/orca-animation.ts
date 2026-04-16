@@ -99,6 +99,35 @@ function bubbleRow(index: number, tick: number): string {
 
 const TOTAL_ROWS = 8; // visible height of the animation region
 
+// ─── ORCASTRATOR title (5x5 pixel-art per letter) ─────────────────────────────
+// Each glyph is 5 cols × 5 rows, joined with a single-space gutter.
+const GLYPHS: Record<string, string[]> = {
+  O: ["█████", "█   █", "█   █", "█   █", "█████"],
+  R: ["████ ", "█   █", "████ ", "█  █ ", "█   █"],
+  C: ["█████", "█    ", "█    ", "█    ", "█████"],
+  A: [" ███ ", "█   █", "█████", "█   █", "█   █"],
+  S: ["█████", "█    ", "█████", "    █", "█████"],
+  T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
+};
+
+const TITLE = "ORCASTRATOR";
+const TITLE_ROWS = 5;
+
+function buildTitleRow(row: number): string {
+  const parts: string[] = [];
+  for (const ch of TITLE) {
+    const glyph = GLYPHS[ch];
+    if (glyph) parts.push(glyph[row]);
+  }
+  return parts.join(" ");
+}
+
+function titleFits(): boolean {
+  // 11 glyphs × 5 cols + 10 gutters = 65, plus margin
+  const need = TITLE.length * 5 + (TITLE.length - 1) + MARGIN;
+  return (process.stdout.columns || 80) >= need;
+}
+
 interface Frame {
   lines: string[];
 }
@@ -185,6 +214,15 @@ export async function playOrcaAnimation(): Promise<void> {
     }
     process.stdout.write(MOVE_UP(frameHeight));
     frameHeight = 0;
+  }
+
+  // Phase 5: Reveal ORCASTRATOR title (persistent — printed below any future output)
+  if (titleFits()) {
+    const M = " ".repeat(MARGIN);
+    for (let row = 0; row < TITLE_ROWS; row++) {
+      process.stdout.write(M + bub(buildTitleRow(row)) + "\n");
+      await delay(70);
+    }
   }
 
   process.stdout.write(SHOW_CURSOR);
