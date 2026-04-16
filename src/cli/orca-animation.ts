@@ -17,10 +17,22 @@ const bubD   = chalk.dim.cyan;
 const sparkW = chalk.bold.white;
 const dot    = chalk.dim.magenta;
 
+// ─── Terminal width helper ─────────────────────────────────────────────────────
+const MARGIN = 2; // left padding ("  ")
+
+function getContentWidth(): number {
+  const cols = process.stdout.columns || 80;
+  return cols - MARGIN;
+}
+
+// Visual width of a single character (﹏ is East Asian Wide = 2 columns)
+function charWidth(ch: string): number {
+  return ch === "﹏" ? 2 : 1;
+}
+
 // ─── Wave tape (scrolling water surface) ──────────────────────────────────────
 const TAPE     = "﹏﹏⊹˖﹏﹏·﹏﹏˖﹏﹏·﹏⊹﹏﹏˖·⊹˖﹏﹏";
 const TAPE_LEN = TAPE.length;
-const ROW_W    = 36;
 
 function colorWaveChar(ch: string): string {
   switch (ch) {
@@ -32,22 +44,33 @@ function colorWaveChar(ch: string): string {
 }
 
 function waveRow(offset: number): string {
+  const targetW = getContentWidth();
   const norm = ((offset % TAPE_LEN) + TAPE_LEN) % TAPE_LEN;
-  const src  = TAPE + TAPE + TAPE;
-  return [...src.slice(norm, norm + ROW_W)].map(colorWaveChar).join("");
+  const src  = TAPE.repeat(Math.ceil((targetW + TAPE_LEN) / TAPE_LEN));
+  const chars: string[] = [];
+  let vis = 0;
+  for (let i = norm; vis < targetW && i < src.length; i++) {
+    const ch = src[i];
+    const w  = charWidth(ch);
+    if (vis + w > targetW) break;
+    chars.push(colorWaveChar(ch));
+    vis += w;
+  }
+  return chars.join("");
 }
 
 // ─── Bubble patterns ─────────────────────────────────────────────────────────
-// Each pattern is ROW_W wide; spaces are empty water.
-const BUBBLE_ROWS = [
-  "        ◦               °           ",
-  "   °          ○       ◦        °    ",
-  "          ◦        °        ○       ",
-  "     ○         ◦          °     ◦   ",
-  "  ◦        °         ○         ◦    ",
-  "       °        ◦        ○         °",
-  "   ○       ◦          °       ○     ",
-  "        °        ○       ◦         °",
+// Bubble positions are defined as fractional offsets (0–1) within the row width.
+// Each entry is [fraction, char]. Generated at render time to fit terminal width.
+const BUBBLE_SEEDS: Array<Array<[number, string]>> = [
+  [[0.22, "◦"], [0.55, "°"]],
+  [[0.08, "°"], [0.36, "○"], [0.61, "◦"], [0.86, "°"]],
+  [[0.28, "◦"], [0.53, "°"], [0.78, "○"]],
+  [[0.14, "○"], [0.39, "◦"], [0.64, "°"], [0.83, "◦"]],
+  [[0.06, "◦"], [0.28, "°"], [0.53, "○"], [0.78, "◦"]],
+  [[0.19, "°"], [0.42, "◦"], [0.64, "○"], [0.89, "°"]],
+  [[0.08, "○"], [0.31, "◦"], [0.58, "°"], [0.81, "○"]],
+  [[0.22, "°"], [0.47, "○"], [0.69, "◦"], [0.89, "°"]],
 ];
 
 function colorBubbleChar(ch: string): string {
@@ -60,8 +83,14 @@ function colorBubbleChar(ch: string): string {
 }
 
 function bubbleRow(index: number, tick: number): string {
-  const row = BUBBLE_ROWS[(index + tick) % BUBBLE_ROWS.length];
-  return [...row].map(colorBubbleChar).join("");
+  const w = getContentWidth();
+  const seed = BUBBLE_SEEDS[(index + tick) % BUBBLE_SEEDS.length];
+  const row = Array(w).fill(" ");
+  for (const [frac, ch] of seed) {
+    const pos = Math.min(Math.floor(frac * w), w - 1);
+    row[pos] = ch;
+  }
+  return row.map(colorBubbleChar).join("");
 }
 
 // ─── Frame assembly ──────────────────────────────────────────────────────────
@@ -76,7 +105,7 @@ interface Frame {
 
 function buildFrame(tick: number, waveCount: number, bubbleCount: number): Frame {
   const lines: string[] = [];
-  const M = "  ";
+  const M = " ".repeat(MARGIN);
 
   // Wave rows at the top
   for (let i = 0; i < waveCount; i++) {
@@ -99,6 +128,13 @@ function renderFrame(lines: string[]): void {
   for (const line of lines) {
     process.stdout.write(CLEAR_LINE + line + "\n");
   }
+  // Clear leftover lines from the previous (taller) frame
+  const extra = frameHeight - lines.length;
+  for (let i = 0; i < extra; i++) {
+    process.stdout.write(CLEAR_LINE + "\n");
+  }
+  // Move back up past the blank lines so subsequent frames stay anchored
+  if (extra > 0) process.stdout.write(MOVE_UP(extra));
   frameHeight = lines.length;
 }
 
