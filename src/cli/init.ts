@@ -133,8 +133,24 @@ async function generateSmartConfig(cwd: string): Promise<string> {
     });
 
     try {
-      const response = await sendMessage(session, prompt, 120_000);
-      const generated = parseGeneratedConfig(response);
+      let generated;
+      try {
+        const response = await sendMessage(session, prompt, 120_000);
+        generated = parseGeneratedConfig(response);
+      } catch (firstErr) {
+        try {
+          genSpinner.text = "Retrying with stricter JSON prompt...";
+          const retry = await sendMessage(
+            session,
+            "Your previous response was not valid JSON. Please respond with ONLY a raw JSON object (no markdown, no code fences, no explanation). Just the JSON.",
+            120_000,
+          );
+          generated = parseGeneratedConfig(retry);
+        } catch {
+          throw firstErr;
+        }
+      }
+
       const configSource = generateConfigSource(generated);
 
       genSpinner.succeed("Agent team generated");

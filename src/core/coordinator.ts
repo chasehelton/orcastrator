@@ -142,6 +142,7 @@ export class Coordinator {
       guardrailsOverride: this.guardrailsOverride,
       modelTier: tier.modelTier,
       skills: matchedSkills,
+      timeoutMs: tier.timeout > 0 ? tier.timeout * 1000 : undefined,
     });
 
     const duration = Date.now() - start;
