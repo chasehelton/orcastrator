@@ -1,5 +1,6 @@
 // agent-creator.ts — Copilot-powered single-agent generation and config rewrite
 
+import { extractJSON } from "./json-extractor.js";
 import type { OrcastratorConfig, AgentConfig, RoutingRule } from "../core/types.js";
 import type { GeneratedAgent, GeneratedRoutingRule } from "./prompt-builder.js";
 
@@ -97,17 +98,7 @@ ${RESPONSE_SCHEMA}
 // ---------------------------------------------------------------------------
 
 export function parseNewAgentResponse(raw: string): NewAgentResult {
-  const jsonMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  const jsonStr = jsonMatch ? jsonMatch[1].trim() : raw.trim();
-
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-  } catch {
-    throw new Error(
-      "Failed to parse Copilot response as JSON. The model did not return valid JSON.",
-    );
-  }
+  const parsed = extractJSON(raw);
 
   if (!parsed.name || typeof parsed.name !== "string") {
     throw new Error("Generated agent is missing a name.");

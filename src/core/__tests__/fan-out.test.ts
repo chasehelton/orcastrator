@@ -73,7 +73,7 @@ describe("fanOut", () => {
       options.modelTier,
       options.skills,
     );
-    expect(lifecycle.sendTask).toHaveBeenCalledWith("test-agent", options.task);
+    expect(lifecycle.sendTask).toHaveBeenCalledWith("test-agent", options.task, undefined);
   });
 
   it("should handle failed agent spawn", async () => {

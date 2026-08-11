@@ -118,6 +118,21 @@ async function createAgent(cwd: string, description?: string): Promise<void> {
       const response = await sendMessage(session, prompt, 120_000);
       result = parseNewAgentResponse(response);
       spinner.succeed("Agent generated");
+    } catch (firstErr) {
+      // Retry once with an explicit follow-up asking for pure JSON
+      try {
+        spinner.text = "Retrying with stricter JSON prompt...";
+        const retry = await sendMessage(
+          session,
+          "Your previous response was not valid JSON. Please respond with ONLY a raw JSON object (no markdown, no code fences, no explanation). Just the JSON.",
+          120_000,
+        );
+        result = parseNewAgentResponse(retry);
+        spinner.succeed("Agent generated (on retry)");
+      } catch {
+        // Surface the original error, not the retry error
+        throw firstErr;
+      }
     } finally {
       await closeSession(session);
     }
@@ -163,9 +178,24 @@ async function createAgent(cwd: string, description?: string): Promise<void> {
       chalk.bold("orcastrator.config.ts"),
     );
 
-    // 7. Auto-run build
+    // 7. Auto-run build — construct the updated config in-memory so buildCommand
+    //    doesn't re-import from disk and hit Node's stale ESM module cache
+    //    (dynamic import() caches by URL; the file changed but the URL didn't).
+    //    Normalize model: null → undefined to match AgentConfig's type.
+    const normalizedAgent = {
+      ...agent,
+      model: agent.model ?? undefined,
+    };
+    const updatedConfig = {
+      ...config,
+      agents: [...config.agents, normalizedAgent],
+      routing: {
+        ...config.routing,
+        rules: [...config.routing.rules, ...routingRules],
+      },
+    };
     console.log();
-    await buildCommand();
+    await buildCommand(updatedConfig);
   } catch (error) {
     spinner.fail("Agent creation failed");
     const message = error instanceof Error ? error.message : String(error);

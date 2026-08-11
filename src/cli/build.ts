@@ -3,12 +3,21 @@
 import chalk from "chalk";
 import { loadConfig, getOrcastratorDir } from "../config/loader.js";
 import { generateOrcastratorDir } from "../config/generator.js";
+import type { OrcastratorConfig } from "../core/types.js";
 
-export async function buildCommand(): Promise<void> {
+export async function buildCommand(
+  /** Pass a pre-loaded config to skip re-importing from disk (avoids ESM module cache stale-read). */
+  preloadedConfig?: OrcastratorConfig,
+): Promise<void> {
   const cwd = process.cwd();
 
-  console.log(chalk.dim("Loading config..."));
-  const config = await loadConfig(cwd);
+  let config: OrcastratorConfig;
+  if (preloadedConfig) {
+    config = preloadedConfig;
+  } else {
+    console.log(chalk.dim("Loading config..."));
+    config = await loadConfig(cwd);
+  }
 
   const orcastratorDir = getOrcastratorDir(cwd);
   generateOrcastratorDir(config, orcastratorDir);

@@ -13,6 +13,7 @@ import { getOrcastratorDir } from "../config/loader.js";
 import { buildGuardrails, type GuardrailConfig } from "../guardrails/index.js";
 import type { GuardrailsOverride } from "../client/copilot.js";
 import { bus } from "./event-bus.js";
+import { appendHistory } from "../state/history.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -174,9 +175,11 @@ export class ChatSession {
         }
 
         try {
+          const timeoutMs = tier.timeout > 0 ? tier.timeout * 1000 : undefined;
           const response = await this.lifecycle.sendTask(
             agentConfig.name,
             prompt,
+            timeoutMs,
           );
 
           // Record both sides of this exchange in the shared history
@@ -194,6 +197,17 @@ export class ChatSession {
           // Trim to keep history window bounded
           if (this.history.length > MAX_HISTORY_TURNS) {
             this.history = this.history.slice(-MAX_HISTORY_TURNS);
+          }
+
+          // Persist to on-disk history so future charters carry forward learnings
+          try {
+            appendHistory(this.orcastratorDir, agentConfig.name, {
+              timestamp: new Date().toISOString(),
+              task: userMessage,
+              outcome: response,
+            });
+          } catch {
+            // Don't fail the turn if history writing fails
           }
 
           results.push({

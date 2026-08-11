@@ -50,13 +50,22 @@ npx orcastrator list
 | `orcastrator run "<task>"` | Execute an ad-hoc task |
 | `orcastrator run "<task>" -v` | Execute with verbose activity panel |
 | `orcastrator run "<task>" -q` | Execute with minimal output (spinner only) |
+| `orcastrator run "<task>" -a <name>` | Force routing to a specific agent |
+| `orcastrator run "<task>" --pr` | Execute and open a PR with results when done |
+| `orcastrator run "<task>" --dry-run` | Preview routing decision without executing |
 | `orcastrator chat` | Start an interactive multi-turn chat session |
 | `orcastrator chat -v` | Chat with verbose activity panel |
+| `orcastrator chat -a <name>` | Lock chat to a specific agent (bypass routing) |
 | `orcastrator issue <number>` | Work on a GitHub issue (e.g. `42`) |
 | `orcastrator issue <identifier>` | Work on a Linear issue (e.g. `ENG-123`) |
+| `orcastrator issue <ref> -a <name>` | Force a specific agent to handle the issue |
+| `orcastrator issue <ref> -r <owner/repo>` | Specify GitHub repo (defaults to git remote) |
+| `orcastrator issue <ref> -p <github\|linear>` | Override provider auto-detection |
+| `orcastrator issue <ref> --pr` | Open a PR on completion |
 | `orcastrator list` | List open issues (Linear or GitHub) |
 | `orcastrator list --provider linear --team ENG` | List open Linear issues for a team |
 | `orcastrator list --mine` | List issues assigned to you |
+| `orcastrator list -r <owner/repo>` | List GitHub issues for a specific repo |
 | `orcastrator doctor` | Check environment and config health |
 | `orcastrator nap` | Compress history and prune old logs |
 | `orcastrator nap --dry-run` | Preview what `nap` would clean |
@@ -65,9 +74,50 @@ npx orcastrator list
 | `orcastrator import <file>` | Import config + state from a snapshot |
 | `orcastrator import <file> --no-merge` | Overwrite instead of merging |
 | `orcastrator status` | Show agents, routing, and recent sessions |
-| `orcastrator agents list` | List configured agents |
+| `orcastrator agents list` | List configured agents with model and charter status |
+| `orcastrator agents create "<description>"` | Generate a new agent via Copilot and add it to config |
 
 The issue provider is **auto-detected**: identifiers like `ENG-123` route to Linear; plain numbers like `42` route to GitHub. Use `--provider` to override.
+
+### agents list
+
+`orcastrator agents list` prints each configured agent with its resolved model, expertise, and whether the charter file has been built:
+
+```
+Team: my-project
+
+backend-dev
+  Role:      Backend Engineer
+  Model:     claude-sonnet-4.6
+  Expertise: TypeScript, Node.js, databases
+  Charter:   ✓ built
+
+frontend-dev
+  Role:      Frontend Engineer
+  Model:     claude-haiku-4.5
+  Expertise: React, CSS, accessibility
+  Charter:   ✗ run build
+```
+
+### agents create
+
+`orcastrator agents create` uses Copilot to generate a new agent definition from a plain-English description, then interactively adds it to your config:
+
+```bash
+# Prompted interactively if no description is given
+npx orcastrator agents create "a database migration specialist"
+
+# Or provide it inline
+npx orcastrator agents create "an accessibility reviewer who audits HTML and ARIA"
+```
+
+Orcastrator calls Copilot with your existing team as context, generates a `defineAgent(...)` block and matching routing rules, shows a preview, asks for confirmation, rewrites `orcastrator.config.ts`, and auto-runs `orcastrator build` — all in one step.
+
+**Resilient JSON parsing:** If Copilot returns prose or markdown instead of raw JSON, `agents create` automatically retries with a stricter follow-up prompt before surfacing an error. No manual retries needed.
+
+**Non-destructive config rewrite:** `generateUpdatedConfigSource()` reconstructs `orcastrator.config.ts` from the in-memory config object, preserving all optional sections — `skills`, `linear`, `modelTiers`, and `guardrails` — exactly as they were. Runtime hook functions (e.g. `preToolUse`) are serialized as `guardrails: true` since closures can't round-trip through source generation.
+
+**ESM cache bypass:** After writing the new config file, `agents create` runs `orcastrator build` against the updated in-memory config object — never re-imports the config file from disk, which would serve a stale cached module.
 
 ## Config
 
@@ -116,6 +166,20 @@ export default defineOrcastrator({
   linear: {
     defaultTeam: "ENG",  // Used by `orcastrator list` when no --team flag is given
   },
+
+  // Optional: enable guardrails (true = all defaults, or customize)
+  guardrails: {
+    blockedCommands: ["rm -rf /", "git push --force"],  // deny-list (merged with defaults)
+    allowedWritePaths: ["src/**", "tests/**"],           // glob paths agents may write to
+    preToolUse: [                                         // custom hook — runs before every tool call
+      async ({ toolName, toolArgs, cwd }) => {
+        if (toolName === "write_file" && /* dangerous path check */ false) {
+          return { decision: "deny", reason: "protected path" };
+        }
+        return { decision: "allow" };
+      },
+    ],
+  },
 });
 ```
 
@@ -128,6 +192,52 @@ export default defineOrcastrator({
 When working on a Linear issue, orcastrator will automatically:
 - Mark the issue **In Progress** when work starts
 - Post a PR comment and mark the issue **In Review** when a PR is created (`--pr` flag)
+
+## Guardrails
+
+Guardrails are opt-in safety policies that run before and after every agent tool call. Enable them in config with `guardrails: true` (all defaults) or a config object:
+
+```typescript
+guardrails: {
+  // Shell commands that are always denied — merged with the built-in deny list
+  blockedCommands: ["my-dangerous-script"],
+
+  // Glob patterns for paths agents are allowed to write to (default: "**")
+  allowedWritePaths: ["src/**", "tests/**", "docs/**"],
+
+  // Hook called before every tool execution — return "deny" to block
+  preToolUse: [
+    async ({ toolName, toolArgs, cwd }) => {
+      return { decision: "allow" };  // or { decision: "deny", reason: "..." }
+    },
+  ],
+
+  // Hook called after every tool execution — can modify the result
+  postToolUse: [
+    async ({ toolName, toolResult, cwd }) => {
+      return {};  // or { modifiedResult: ... }
+    },
+  ],
+}
+```
+
+**Built-in blocked commands** (always active when guardrails are enabled):
+`rm -rf /`, `rm -rf ~`, `git push --force`, `chmod 777`, `chmod -R 777`, fork bombs, disk-wipe patterns, and similar destructive operations.
+
+`guardrails: true` applies all defaults without customization. Omitting `guardrails` entirely disables the system.
+
+## Response Tiers
+
+Orcastrator automatically classifies task complexity before routing to avoid over-spending on simple requests:
+
+| Tier | Trigger | Model tier | Max agents | Timeout |
+|------|---------|-----------|-----------|---------|
+| `direct` | Short greetings / `hi`, `help`, `status` | none (inline reply) | 0 | — |
+| `lightweight` | `list`, `show`, `find`, `rename`, `check` keywords | `fast` | 1 | 30s |
+| `standard` | Default — any task not matched above | `standard` | 1 | 120s |
+| `full` | `refactor entire`, `implement feature`, `security audit`, `multi-agent` | `premium` | 5 | 300s |
+
+Tier selection maps to `modelTiers` in your config. The `tier.selected` event is emitted on every task so you can observe decisions in the activity panel or event bus subscribers.
 
 ## Skills
 
@@ -153,11 +263,11 @@ Orcastrator emits typed events during task execution for observability and tooli
 
 | Event | Payload |
 |-------|---------|
-| `tier.selected` | `{ tier, model, reason }` |
-| `task.started` | `{ task }` |
-| `agent.spawned` | `{ agent, model }` |
-| `agent.completed` | `{ agent, duration }` |
-| `task.completed` | `{ task, agents, duration }` |
+| `tier.selected` | `{ task, tier, reason }` |
+| `task.started` | `{ task, agents }` |
+| `agent.spawned` | `{ agentName, success }` |
+| `agent.completed` | `{ agentName, success, duration? }` |
+| `task.completed` | `{ strategy, duration, agentCount }` |
 | `agent.intent` | `{ agentName, intent }` |
 | `agent.turn.start` | `{ agentName, turnId }` |
 | `agent.turn.end` | `{ agentName, turnId }` |
@@ -166,7 +276,17 @@ Orcastrator emits typed events during task execution for observability and tooli
 | `agent.tool.complete` | `{ agentName, toolCallId, toolName, success, snippet? }` |
 | `agent.subagent.started` | `{ agentName, subagentName, description }` |
 
-The `agent.*` events are relayed from Copilot SDK session events via the **EventRelay** (`src/agents/event-relay.ts`), which auto-attaches to every agent session. These events power the live activity panel in the CLI.
+The `agent.*` events are relayed from Copilot SDK session events via the **EventRelay** (`src/agents/event-relay.ts`), which auto-attaches to every agent session in `AgentLifecycleManager.spawnAgent()` and is cleanly detached when `destroyAgent()` is called. These events power the live activity panel in the CLI.
+
+Subscribe to any event from your own code via `getEventBus()`:
+
+```typescript
+import { getEventBus } from "orcastrator/event-bus";
+
+getEventBus().on("agent.tool.start", ({ agentName, toolName }) => {
+  console.log(`[${agentName}] started tool: ${toolName}`);
+});
+```
 
 ## Activity Panel
 
@@ -201,7 +321,65 @@ Multi-agent tasks show stacked panels:
 
 In `run` mode the panel persists as a summary after completion. In `chat` mode it clears when the response arrives.
 
-## Architecture
+## Chat Slash Commands
+
+Inside `orcastrator chat`, type a `/command` at the prompt to control the session without sending a message to an agent:
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Print the slash command reference |
+| `/exit` | Exit the chat session cleanly |
+| `/quit`, `/q` | Aliases for `/exit` |
+| `/clear` | Wipe conversation history (agent sessions stay warm) |
+| `/history` | Print the full conversation history for this session |
+| `/status` | Show routing mode, turn count, and active agents |
+| `/agent <name>` | Lock all subsequent messages to a specific agent |
+| `/switch <name>` | Alias for `/agent` |
+| `/auto` | Return to automatic routing (cancels any agent lock) |
+
+History is capped at 20 turns (10 full exchanges) and trimmed automatically — older context is dropped to keep prompts from growing unbounded. Agent sessions stay alive across turns so models don't lose in-process state when the history window rolls.
+
+## Orca Animation
+
+When you start `orcastrator chat`, the terminal plays a multi-phase underwater animation before the REPL prompt appears:
+
+| Phase | Description |
+|-------|-------------|
+| 1 — Bubbles rise | `◦ ° ○` bubble characters fill the frame from nothing, bottom to top |
+| 2 — Waves crash | Three cyan wave rows (`﹏⊹˖·`) roll in from the top, pushing bubbles down |
+| 3 — Underwater drift | Waves scroll and bubbles drift for ~1 second |
+| 4 — Settle | Frame collapses row-by-row as the dive completes |
+| 5 — Title reveal | Pixel-art `ORCASTRATOR` logo fades in line-by-line (skipped on narrow terminals) |
+
+The animation is **terminal-width-responsive**: bubble positions are computed as fractional offsets of the actual column count so the layout never wraps or clips. The pixel-art title requires at least 67 columns; on narrower terminals Phase 5 is silently skipped.
+
+## Orca Tamagotchi
+
+`src/cli/orca-tamagotchi.ts` provides a reusable orca character renderer used for CLI welcome screens and status displays.
+
+```typescript
+import { renderOrcaCharacter, renderOrcaGreeting } from "./orca-tamagotchi.js";
+
+// Render the ASCII orca in a given mood (returns string[])
+const lines = renderOrcaCharacter("excited");
+
+// Render a full greeting block (orca + title + hint line)
+console.log(renderOrcaGreeting("my-project"));
+```
+
+**Available moods:**
+
+| Mood | Eye | Mouth | When used |
+|------|-----|-------|-----------|
+| `happy` | `◉` | `‿‿` | Default / idle |
+| `excited` | `★` | `▽▽` | Task started |
+| `working` | `◈` | `──` | Agent is executing |
+| `thinking` | `◉` | `··` | Routing / planning |
+| `sleeping` | `–` | `___` | Nap / history compression |
+
+`renderOrcaCharacter(mood)` returns raw lines (~20 visible chars each) with no surrounding decoration — callers are responsible for margins or box-drawing. `renderOrcaGreeting(name?)` composes the character with a bold title and a `/help` hint line.
+
+
 
 ```
 User (CLI)
@@ -231,6 +409,31 @@ User (CLI)
                  │ActivityRenderer  │
                  │ Live TUI panel  │
                  └─────────────────┘
+```
+
+## `.orcastrator/` Directory
+
+Orcastrator keeps all runtime state in `.orcastrator/` at your project root. This directory is committed to git so agent decisions and history travel with your repo.
+
+| Path | Description |
+|------|-------------|
+| `decisions.md` | Shared team decisions injected into every agent's system prompt |
+| `routing.md` | Human-readable routing rules (generated by `orcastrator build`) |
+| `agents/<name>/charter.md` | Per-agent charter / system prompt (generated by `orcastrator build`) |
+| `agents/<name>/history.md` | Per-agent learning log — updated after every task |
+| `skills/<name>/SKILL.md` | Markdown-based skill plugins with YAML frontmatter |
+| `log/` | Session logs written as JSON after every task |
+
+The `decisions.md` file is the best place to record project-wide conventions you want every agent to know (e.g. "always use Zod for validation", "never commit API keys"). Edit it directly — it's injected verbatim.
+
+## Development
+
+```bash
+npm run build       # tsc → compiles src/ to dist/
+npm run dev         # tsc --watch (recompile on save)
+npm run typecheck   # tsc --noEmit (type-check without emitting)
+npm run test        # vitest run (single pass)
+npm run test:watch  # vitest (watch mode)
 ```
 
 ## Requirements

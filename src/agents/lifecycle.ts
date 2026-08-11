@@ -91,14 +91,14 @@ export class AgentLifecycleManager {
     }
   }
 
-  async sendTask(agentName: string, prompt: string): Promise<string> {
+  async sendTask(agentName: string, prompt: string, timeoutMs?: number): Promise<string> {
     const managed = this.agents.get(agentName);
     if (!managed) {
       throw new Error(`Agent "${agentName}" not found or not spawned`);
     }
 
     managed.handle.status = "active";
-    const response = await copilot.sendMessage(managed.session, prompt);
+    const response = await copilot.sendMessage(managed.session, prompt, timeoutMs);
     managed.handle.status = "idle";
 
     return response;
